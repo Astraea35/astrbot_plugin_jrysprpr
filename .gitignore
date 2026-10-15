@@ -2,3 +2,7 @@ avatars/
 __pycache__/
 backgroundFolder/images/
 *.pyc
+上传GitHub.py
+upload.py
+upload.bat
+.pytest_cache/

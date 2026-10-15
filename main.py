@@ -2,6 +2,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from astrbot.api import AstrBotConfig
+from astrbot.api.message_components import Image, Plain
 import os
 import asyncio
 from datetime import datetime
@@ -11,7 +12,7 @@ from .resources import ResourceManager
 from .painter import FortunePainter
 
 
-@register("今日运势", "ominus", "一个今日运势海报生成图", "1.0.3")
+@register("今日运势", "Astraea35", "一个今日运势海报生成图", "1.0.6")
 class JrysPlugin(Star):
     """今日运势插件,可生成今日运势海报"""
 
@@ -100,15 +101,39 @@ class JrysPlugin(Star):
         if event.get_platform_name() == "telegram":
             try:
                 fortune = self.painter.select_fortune("tg:" + user_id, self.jrys_data)
+                date_str = datetime.now().strftime("%Y-%m-%d")
+                summary = fortune.get("fortuneSummary", "今日运势")
+                stars = fortune.get("luckyStar", "")
+                sign = fortune.get("signText", "")
+                unsign = fortune.get("unsignText", "")
+                name = user_name or "旅行者"
+
                 text = (
-                    f"**今日运势 · {datetime.now().strftime('%Y-%m-%d')}**\n\n"
-                    f"**{fortune.get('fortuneSummary', '今日运势')}**\n"
-                    f"幸运星：{fortune.get('luckyStar', '')}\n\n"
-                    f"**宜**\n{fortune.get('signText', '')}\n\n"
-                    f"**忌**\n{fortune.get('unsignText', '')}\n\n"
-                    "仅供娱乐，相信科学。"
+                    "🔮 **今日运势 · 每日一签**\n\n"
+                    f"📅 `{date_str}` · 签主：`{name}`\n"
+                    f"✨ **【 {summary} 】**  🌟 幸运指数：`{stars}`\n\n"
+                    f"> 🟢 **【宜】** {sign}\n"
+                    f"> 🔴 **【忌】** {unsign}\n\n"
+                    "💡 *运势仅供娱乐参考，心向阳光万事皆安*"
                 )
-                yield event.plain_result(text)
+
+                bg_path = None
+                try:
+                    bg_res = await self.resources.get_background_image()
+                    if bg_res and bg_res[0] and os.path.exists(bg_res[0]):
+                        bg_path = bg_res[0]
+                except Exception:
+                    logger.warning("获取运势背景图片失败，尝试使用默认封面")
+
+                if not bg_path:
+                    default_img = os.path.join(self.resources.data_dir, "README.assets", "1.jpg")
+                    if os.path.exists(default_img):
+                        bg_path = default_img
+
+                if bg_path:
+                    yield event.chain_result([Image.fromFileSystem(bg_path), Plain(text)])
+                else:
+                    yield event.plain_result(text)
             except (KeyError, ValueError, IndexError):
                 logger.exception("Telegram fortune data is unavailable")
                 yield event.plain_result("运势数据暂时不可用，请稍后重试。")
